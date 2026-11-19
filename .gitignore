@@ -1,0 +1,11 @@
+tools/_*.png
+# 素材リポジトリから つないだ画像（公開リポジトリには入れない）
+images
+assets.local.js
+assets.local.css
+sounds
+
+# Teams用ZIP（非公開素材入り。コミットしない）
+manabato2.zip
+manabato2.html
+manabato2-canva.html
