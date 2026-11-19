@@ -27,7 +27,8 @@ CHECK = r"""() => {
       const t = n.textContent, rg = document.createRange(), lines = new Map();
       for (let i = 0; i < t.length; i++) { rg.setStart(n, i); rg.setEnd(n, i + 1); const rr = rg.getClientRects()[0]; if (!rr || !rr.width) continue; const k = Math.round(rr.top / 4); if (!lines.has(k)) lines.set(k, ''); lines.set(k, lines.get(k) + t[i]); }
       const ls = [...lines.keys()].sort((a, b) => a - b).map(k => lines.get(k).trim()).filter(Boolean);
-      if (ls.length > 1 && ls[ls.length - 1].replace(/[、。！？!?）)」』…ー〜]/g, '').length <= 2) out.push(['改行', name(e), ls.join(' / ').slice(0, 60)]);
+      // うしろに 用語の リンクなどが つづく 文は、行の さいごが その リンクに つながるので 見ない（まなびバトル2）
+      if (ls.length > 1 && !(n.nextSibling && n.nextSibling.nodeType === 1) && ls[ls.length - 1].replace(/[、。！？!?）)」』…ー〜]/g, '').length <= 2) out.push(['改行', name(e), ls.join(' / ').slice(0, 60)]);
     }
     if (e.scrollWidth > e.clientWidth + 2 && cs.textOverflow !== 'ellipsis' && cs.display !== 'inline' && e.clientWidth > 0) out.push(['はみ出し(横)', name(e), e.textContent.trim().slice(0, 30)]);
     // 文字が 自分の箱から はみ出していないか（中央ぞろえで 左右に はみ出すものも 見つける）

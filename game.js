@@ -586,7 +586,7 @@
   // タイトル・名前を決める・せってい
   // =====================================================================
   // タイトルロゴ（画像があれば画像。なければ 文字）
-  const logoHtml = (px, w = 640) => (g2(A, 'ui', 'logo') ? `<span class="logow"><img class="logo" style="width:${w}px" src="${esc(A.ui.logo)}" alt="まなびバトル2" onerror="this.outerHTML='<div style=&quot;font-size:${px}px&quot;>⚔️ まなびバトル2</div>'"><span class="logo2" style="font-size:${Math.round(w * 0.2)}px">2</span></span>` : `<div style="font-size:${px}px">⚔️ まなびバトル2</div>`);
+  const logoHtml = (px, w = 640) => (g2(A, 'ui', 'logo') ? `<span class="logow" style="padding-right:${Math.round(w * 0.13)}px"><img class="logo" style="width:${w}px" src="${esc(A.ui.logo)}" alt="まなびバトル2" onerror="this.outerHTML='<div style=&quot;font-size:${px}px&quot;>⚔️ まなびバトル2</div>'"><span class="logo2" style="font-size:${Math.round(w * 0.2)}px">2</span></span>` : `<div style="font-size:${px}px">⚔️ まなびバトル2</div>`);
   function titleScreen() {
     const el = render(`<div class="scr center">
       ${logoHtml(72)}
@@ -1893,7 +1893,7 @@
   function gaugeStep(a, st, ok) {
     if (ok) {
       st.g += 1; st.correct++; st.run++; if (a.has('失敗は成功のもと') && a.fail) { st.bonus += 0.2 * a.fail; a.fail = 0; } a.streak++;
-      if (a.has('赤ペン') && st.prevNg) { st.g += 1; st.correct++; st.redpen = (st.redpen || 0) + 1; } // まちがえた 直後の 正解は 2問分
+      if (a.has('赤ペン') && st.prevNg) { st.g += 0.5; st.correct++; st.redpen = (st.redpen || 0) + 1; } // まちがえた 直後の 正解は 2問分（ゲージは +0.5・正解の 数は +1）
     } else {
       if (a.has('やり直し消しゴム') && a.eraser > 0) { a.eraser--; st.g += 1; st.eraserUsed = true; } else st.g += 0.5;
       st.run = 0; a.fail++; if (a.has('連続正解の炎')) a.streak = 0;
@@ -2019,7 +2019,7 @@
     if (a.has('弱点さがしの虫めがね') && recvMult(d, subj) > 1) up('弱点さがしの虫めがね', 1.1);
     // ---- まなびバトル2 の アイテム ----
     const hpr = f => f.hp / f.maxhp, okN = (act.ans || []).filter(x => x).length, ngN = (act.ans || []).filter(x => !x).length;
-    if (a.has('チョーク') && a.lastsubj === subj) up('チョーク', 1.15);
+    if (a.has('チョーク') && a.lastsubj === subj) up('チョーク', 1.1);
     if (a.has('時間割表')) { const k = new Set([...Object.values(a.hist || {}), subj]).size; up('時間割表', 1 + Math.min(0.30, 0.06 * k)); }
     if (a.has('学級日誌') && turn > 1 && a.okPrev >= 0 && okN > a.okPrev) up('学級日誌', 1.2);
     if (a.has('ものまねインコ') && (d.hist || {})[turn - 1] === subj) up('ものまねインコ', 1.15);
@@ -2133,7 +2133,7 @@
     // ---- まなびバトル2 ----
     if (f.has('水とう') && CURT === 3 && f.hp > 0 && f.hp < f.maxhp) { const h = Math.min(f.maxhp - f.hp, R0(0.10 * f.maxhp)); f.hp += h; log(`${esc(f.name)}の ${itn('水とう')}の効果で、HPが ${h} 回復した！`, { fx: [[f.side, '水とう']] }); }
     if (f.boomT === CURT && f.boomD > 0 && f.hp > 0 && f.opp.hp > 0) { const dm = f.boomD; f.opp.hp -= dm; f.boomT = 0; f.boomD = 0; log(`${esc(f.name)}の ${itn('ブーメラン')}が もどってきて、${esc(f.opp.name)}に ${dm} ダメージ！`, { fx: [[f.side, 'ブーメラン']] }); }
-    if (f.has('卒業証書') && CURT === lastT() && !f.used.has('卒業証書') && f.hp > 0 && f.opp.hp > 0 && f.dealtTot > 0) { f.used.add('卒業証書'); const dm = Math.max(1, R0(0.2 * f.dealtTot)); f.opp.hp -= dm; log(`${esc(f.name)}の ${itn('卒業証書')}の効果で、${esc(f.opp.name)}に ${dm} の 追加ダメージ！`, { fx: [[f.side, '卒業証書']] }); }
+    if (f.has('卒業証書') && CURT === 3 && !f.used.has('卒業証書') && f.hp > 0 && f.opp.hp > 0 && f.dealtTot > 0) { f.used.add('卒業証書'); const dm = Math.max(1, R0(0.25 * f.dealtTot)); f.opp.hp -= dm; log(`${esc(f.name)}の ${itn('卒業証書')}の効果で、${esc(f.opp.name)}に ${dm} の 追加ダメージ！`, { fx: [[f.side, '卒業証書']] }); }
     Object.keys(f.ct).forEach(k => (f.ct[k] -= 1));
   }
   // 試合の はじめ（1ターン目の ルーレットの前）に 効く アイテム。メッセージの 行を かえす（10/13）
@@ -3057,7 +3057,7 @@
     const el = render(`
       <div class="prog"><span class="mid">📋 問題リスト</span><span class="coin"><button class="btn-gray" id="bk" style="font-size:18px;padding:6px 12px">🏠 ホームへ</button></span></div>
       <div style="position:absolute;top:70px;left:24px;right:24px" class="col">
-        <div class="row">${SUBJ.map(s => `<button data-s="${s}" class="${s === subj ? 'btn-main' : ''}" style="font-size:20px;padding:8px 16px;border-color:${D.SUBJ_COLOR[s]}">${subjIc(s)} ${s}</button>`).join('')}
+        <div class="row qlrow">${SUBJ.map(s => `<button data-s="${s}" class="${s === subj ? 'btn-main' : ''}" style="font-size:20px;padding:8px 16px;border-color:${D.SUBJ_COLOR[s]}">${subjIc(s)} ${s}</button>`).join('')}
           <span style="width:24px"></span>${listGrades(subj).map(g => `<button data-g="${g}" class="${g === grade ? 'btn-blue' : ''}" style="font-size:20px;padding:8px 14px">${g}年</button>`).join('')}</div>
         <div class="sm dim">${subj}：${[2, 3, 4].map(k => `${QST[k][0]}${QST[k][1]} ${cnt(k)}`).join('　')}　⬜まだ ${cnt(0)}</div>
         <div class="panel" id="ql" style="height:520px;overflow-y:auto;padding:8px">

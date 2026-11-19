@@ -1,3 +1,19 @@
+# まなびバトル2（manabato2）引き継ぎメモ（11/19・ver 1.0.0）
+
+旧作 まなびバトル（nochi-jpg/manabi-battle ver 3.0.0）の コードを もとにした 続編。仕様は `docs/SPEC_manabato2.md`、新アイテムは `docs/ITEMS_NEW.md`。
+**この下の「まなびバトル 引き継ぎメモ」は 旧作の もの**（しくみの 説明として のこしている）。
+
+- 問題：nochi-jpg/manabi-resource（となりの フォルダ）→ `python3 tools/import_questions.py` → `questions.js`（6497問。番号は `tools/qids.json` の じゅんで かわらない。せいかつA→社会・B→理科）
+- 学年：`S.grade`（1〜6）。`gradeOf(教科)` が 出す学年（1つ下＋その学年。1年生は 1年・英語は 1〜3年生は 3年）
+- スタミナ：1日1・最大10・ダンジョン1回1（`data.js` の K）
+- QR：目印 M2・形式1。旧作の QR（MB・形式3/4）は `o.legacy`（問題は リセット・スタミナ÷50・学年を 聞く）。対戦・ゴースト・先生用ページは まなびバトル2 の QR だけ
+- アイテム画像：`assets2.js`（`python3 tools/make_assets2.py` で 作る）が 旧作の アイテム画像を 素材リポジトリの `images/item2/iNNN.png`（1から）に 置きかえる
+- 素材リポジトリは 旧作と 同じ nochi-jpg/manabi-battle-assets（となりの フォルダに clone して images・sounds・assets.local.js・assets.local.css を シンボリックリンク）
+- Canva版：`python3 tools/build_html.py --canva` → `manabato2-canva.html`（10MB 以下を 確認。いま 約9.9MB。brotli が いる：pip install brotli）
+- テスト：`tools/*_test.py` と `tools/ui_audit.py`、新アイテムは `tools/new_items_test.py`（勝率の めやす）
+
+---
+
 # まなびバトル 引き継ぎメモ（10/23 時点・ver 3.0.0／Canva版だけ 4.0.0 冬眠版）
 
 小学4〜6年向けの 学習×育成×対戦ゲーム「まなびバトル」。前作「まなびドラゴン」（nochi-jpg/manabi-dragon）の第2作。
