@@ -1,11 +1,15 @@
-// ===== セーブのQRコード（全部入り）の作り方・読み方 =====
-// 形式は docs/QR_FORMAT.md。続編でも同じQRで引きつげるように、項目は「後ろに足す」だけにする
+// ===== セーブのQRコード（全部入り）の作り方・読み方（まなびバトル2）=====
+// 形式は docs/QR_FORMAT.md。項目は「後ろに足す」だけにする
+// 旧作（まなびバトル 3.0.0。目印 'MB'・形式3/4）の QR も 読める（o.legacy。先生の 引きつぎ・復元だけで つかう）
+//   → 問題の 進みぐあいは リセット、スタミナは 50 を 1回分として 10回分まで、学年は 引きつぎのときに 聞く
 window.SAVECODE = (function () {
   'use strict';
   const D = window.DATA, SUBJ = D.SUBJ;
-  const MAGIC = [0x4d, 0x42], FMT = 4;     // 形式4（3.0.0）：形式3の うしろに えらんだ技・あいことば。形式3も 引きつぎでは 読む（o.fmt。対戦は 4だけ）
-  const FMT_MIN = 3;     // 形式3（10/13 配布版）：問題の記録を 圧縮・アイテムは 手に入れた順・ごはん。形式2までは 読まない           // 'MB' ＋ 形式番号
-  const KEY = 'manabi-battle/2026/まなび学園';     // チェック用の数字を作るカギ（書きかえ防止）
+  const MAGIC = [0x4d, 0x32], FMT = 1;     // まなびバトル2：'M2' ＋ 形式1
+  const OLD_MAGIC = [0x4d, 0x42], OLD_FMT = [3, 4]; // 旧作：'MB' ＋ 形式3・4
+  const KEY = 'manabato2/2026/まなびタウン';       // チェック用の数字を作るカギ（書きかえ防止）
+  const OLD_KEY = 'manabi-battle/2026/まなび学園';
+  const OLD_STAMINA_RUN = 50;                       // 旧作の スタミナ 50 ＝ ダンジョン1回
   const BOSS = ['国語', '算数', '理科', '社会', '英語', '無'];
   const TYPES = ['全教科', ...SUBJ], AURA = ['', '銀', '金', '虹'], BG = Object.keys(D.BGS);
   const QCODE = { 2: 1, 3: 2, 4: 3 }, QBACK = [0, 2, 3, 4]; // 0=まだ 1=復習まち 2=あと1回 3=卒業
@@ -55,8 +59,8 @@ window.SAVECODE = (function () {
     for (let k = 0; k < n; k++) { const p = P[prev], h = bit(p, 0), s = (h << 1) | bit(p, 1 + h); out.push(s); prev = s; }
     return out;
   }
-  function hash(bytes) {
-    let h = 0x811c9dc5; const k = te.encode(KEY);
+  function hash(bytes, key = KEY) {
+    let h = 0x811c9dc5; const k = te.encode(key);
     for (const x of [...k, ...bytes, ...k]) { h ^= x; h = Math.imul(h, 0x01000193) >>> 0; }
     return h >>> 0;
   }
@@ -90,7 +94,7 @@ window.SAVECODE = (function () {
     w.u8(HT.reduce((m, t, i) => m | ((S.hidden || []).includes(t) ? 1 << i : 0), 0)); w.u8(HT.indexOf(S.sel.title) + 1);
     w.vu(S.bonusPt || 0); w.u8(Math.min(255, S.gachaToday || 0)); w.u8(S.newDay === S.day ? 1 : 0);
     const rg = (S.run && S.run.gain) || {}; SUBJ.forEach(s => w.vu(Math.max(0, rg[s] || 0)));
-    SUBJ.forEach(s => w.u8((S.qgrade || {})[s] || 4));
+    w.u8(S.grade >= 1 && S.grade <= 6 ? S.grade : 4); // 学年（1〜6）
     w.vu(S.loginN || 0);
     w.u8((S.loginDay === S.day ? 1 : 0) | (S.fedDay === S.day ? 2 : 0)); // 1：きょうの ログインボーナス済み・2：きょうの ごはん済み
     // ---- 形式4（3.0.0）----
@@ -104,16 +108,18 @@ window.SAVECODE = (function () {
   // バイト列 → セーブの中身（書きかえられていたら エラー）
   function decode(bytes) {
     bytes = Array.from(bytes);
-    if (bytes.length < 8 || bytes[0] !== MAGIC[0] || bytes[1] !== MAGIC[1]) throw new Error('まなびバトルのQRではないよ');
+    const isNew = bytes.length >= 8 && bytes[0] === MAGIC[0] && bytes[1] === MAGIC[1];
+    const isOld = bytes.length >= 8 && bytes[0] === OLD_MAGIC[0] && bytes[1] === OLD_MAGIC[1];
+    if (!isNew && !isOld) throw new Error('まなびバトルのQRではないよ');
     const body = bytes.slice(0, -4), tail = bytes.slice(-4);
-    const h = hash(body);
+    const h = hash(body, isNew ? KEY : OLD_KEY);
     if (tail[0] !== (h >>> 24 & 255) || tail[1] !== (h >>> 16 & 255) || tail[2] !== (h >>> 8 & 255) || tail[3] !== (h & 255)) throw new Error('QRが こわれているか、書きかえられているよ');
     const r = new Rd(body); r.i = 2;
     const fmt = r.u8();
-    if (fmt > FMT) throw new Error('新しいバージョンのQRだよ。ゲームを新しくしてね');
-    if (fmt < FMT_MIN) throw new Error('前のバージョンのQRなので 読めないよ。いまのゲームで QRを 出しなおしてね');
+    if (isNew && fmt > FMT) throw new Error('新しいバージョンのQRだよ。ゲームを新しくしてね');
+    if (isOld && !OLD_FMT.includes(fmt)) throw new Error('まなびバトル（前のゲーム）の 古いQRなので 読めないよ。前のゲームで QRを 出しなおしてね');
     const qv = r.u8();
-    if (qv > QV()) throw new Error('新しいバージョンのQRだよ。ゲームを新しくしてね');
+    if (isNew && qv > QV()) throw new Error('新しいバージョンのQRだよ。ゲームを新しくしてね');
     const o = { v: 2, pname: r.str(), cname: r.str(), st: {} };
     SUBJ.forEach(s => (o.st[s] = r.vu()));
     o.type = TYPES[r.u8()] || '全教科';
@@ -131,7 +137,7 @@ window.SAVECODE = (function () {
     const ti = r.u8(), ai = r.u8(), bi = r.u8();
     o.sel = { title: ti && D.ACH[ti - 1] ? D.ACH[ti - 1].r.t || '' : '', aura: AURA[ai] || '', bg: BG[bi] || 'まなびタウン' };
     const qmax = r.vu(), nrc = r.vu(); if (r.i + nrc > body.length) throw new Error('QRが こわれているよ');
-    const sym = rcDecode(body.slice(r.i, r.i + nrc), qmax); r.i += nrc;
+    const sym = isNew ? rcDecode(body.slice(r.i, r.i + nrc), qmax) : []; r.i += nrc; // 旧作の 問題の 記録は 読まない（問題が ちがう）
     o.qs = {}; o.qd = {}; o.miss = {};
     sym.forEach((c, k) => { if (c) o.qs[k + 1] = QBACK[c]; });
     for (const id in o.qs) if (o.qs[id] === 2) o.miss[id] = 1;
@@ -141,15 +147,18 @@ window.SAVECODE = (function () {
     { const HT = D.HIDDEN_TITLES || [], m = r.u8(), si = r.u8(); o.hidden = HT.filter((t, i) => m & (1 << i)); if (si && HT[si - 1]) o.sel.title = HT[si - 1]; }
     o.bonusPt = r.vu(); o.gachaToday = r.u8(); if (r.u8() & 1) o.newDay = o.day;
     o.runGain = null; { const g = {}; SUBJ.forEach(s => (g[s] = r.vu())); if (SUBJ.some(s => g[s])) o.runGain = g; }
-    o.qgrade = {}; SUBJ.forEach(s => { const g = r.u8(); o.qgrade[s] = g >= 4 && g <= 6 ? g : 4; });
+    if (isNew) { const g = r.u8(); o.grade = g >= 1 && g <= 6 ? g : 4; } else SUBJ.forEach(() => r.u8()); // 旧作は 教科ごとの 出題範囲（4〜6）。つかわない
     o.loginN = r.vu(); { const f = r.u8(); if (f & 1) o.loginDay = o.day; if (f & 2) o.fedDay = o.day; }
     o.fmt = fmt; o.skSel = []; o.ak = [];
-    if (fmt >= 4) {
+    if (isNew || fmt >= 4) {
       const sk = r.bits(D.SKILLS.length); o.skSel = D.SKILLS.filter((k, i) => sk[i]).map(k => k.n);
       const n = r.vu(), ak = r.bits(n); ak.forEach((x, i) => { if (x) o.ak.push(i + 1); });
       const ti = r.u8(); if (ti && (D.AK_TITLES || [])[ti - 1] && o.ak.includes(ti)) o.sel.title = D.AK_TITLES[ti - 1];
     }
     o.qs = remapKeys(o.qs, qv); o.miss = remapKeys(o.miss, qv); o.qv = QV();
+    if (isOld) { // 旧作から：スタミナは 回数に（50 で 1回・10回分まで）
+      o.legacy = true; o.stamina = Math.min(D.K.STAMINA_MAX, Math.floor(o.stamina / OLD_STAMINA_RUN)); o.runGain = o.runGain || null;
+    }
     o.tower = {}; o.run = null; o.dungeons = o.dungeons || 0;
     return o;
   }

@@ -3036,8 +3036,8 @@
       const tryBytes = bin => {
         try {
           const o = window.SAVECODE.decode(bin);
-          // 3.0.0：対戦・QRゴースト・まなスタは 新しい QR（形式4）だけ。前の バージョンの QR とは たたかえない
-          if (opt.newOnly && (o.fmt || 0) < 4) { stt.textContent = '⚠️ 前のバージョンのQRだよ。ゲームを 新しくして、QRを 出しなおしてね（前のバージョンとは 対戦できないよ）'; return false; }
+          // まなびバトル2：対戦・QRゴースト・先生用ページは まなびバトル2 の QR だけ。旧作（まなびバトル）の QR は 先生の 引きつぎ・復元だけ
+          if (opt.newOnly && o.legacy) { stt.textContent = '⚠️ まなびバトル（前のゲーム）の QRだよ。まなびバトル2 の「QR」ボタンで 出した QRコードを 見せてね'; return false; }
           done(o); return true;
         } catch (e) { stt.textContent = '⚠️ ' + e.message; return false; }
       };
@@ -3465,7 +3465,12 @@
   // QRの 中身を この本体の セーブに する（デバッグルーム・かくしコマンド の 引きつぎ）
   async function applyTransfer(pr) {
     const rg = pr.runGain; delete pr.runGain;
+    const legacy = pr.legacy; delete pr.legacy;
     S = migrate(pr); S.debug = null; R = null; BT = null; S.run = null; rawSave(); // 引きついだら デバッグモードは必ずオフ
+    if (legacy) { // 旧作（まなびバトル）から：問題の 進みぐあいは リセット。学年を 聞く
+      S.grade = await dialog({ who: '📚', text: `まなびバトル（前のゲーム）から 引きつぎます。\n問題の 進みぐあいは リセットされるよ。\n${esc(S.pname)} さんは なん年生？`, choices: GRADES.map(g => ({ label: `${g}年生`, val: g, cls: g === 4 ? 'btn-main' : '' })) }) || 4;
+      rawSave();
+    }
     await dialog({ who: '✅', text: `引きつぎました！\n${esc(S.pname)} さんの データで はじめられます` });
     // ダンジョンの とちゅうで 上がった分は 本ステータスに 足す（ダンジョンの つづき・拾ったアイテムは 引きつがない）
     if (rg) {
@@ -3567,7 +3572,7 @@
     $('#add', el).onclick = async () => {
       const l = teachLoad();
       for (;;) {
-        const pr = await scanQR(`📊 ${l.length + 1}人目の QRコードを 読みこんでね`, '読みこむたびに 次の人へ。おわったら「やめる」');
+        const pr = await scanQR(`📊 ${l.length + 1}人目の QRコードを 読みこんでね`, '読みこむたびに 次の人へ。おわったら「やめる」', { newOnly: true });
         if (!pr) break;
         const k = l.findIndex(x => x.pname === pr.pname && x.cname === pr.cname);
         if (k >= 0) l[k] = pr; else l.push(pr);
