@@ -4,7 +4,8 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 URL = (ROOT / 'index.html').as_uri() + '?test'
 # 形式3（2.0.x）の savecode.js：形式3の QR を 作るため
-OLD = subprocess.run(['git', 'show', 'dabfb30:savecode.js'], cwd=ROOT, capture_output=True, text=True).stdout.replace('window.SAVECODE =', 'window.OLDCODE =', 1)
+# 旧作（まなびバトル 3.0.0・形式4）の savecode.js（となりの フォルダ ../manabi-battle）
+OLD = (ROOT.parent / 'manabi-battle' / 'savecode.js').read_text(encoding='utf8').replace('window.SAVECODE =', 'window.OLDCODE =', 1).replace('(S.qgrade || {})[s] || 4', '4')
 BOT = (pathlib.Path(__file__).resolve().parent / 'play_test.py').read_text().split('BOT = """')[1].split('"""')[0]
 errors, fails = [], []
 def check(c, m):
@@ -44,22 +45,23 @@ with sync_playwright() as p:
     # ---- QR 形式4 ----
     pg.evaluate("MB.S.ak = [3, 22]; MB.S.sel.title = MB.D.AK_TITLES[2]")
     o = pg.evaluate("(() => { const o = SAVECODE.decode(MB.qrBytes()); return [o.fmt, o.skSel, o.ak, o.sel.title]; })()")
-    check(o[0] == 4 and o[1] == ['通常攻撃', '連続攻撃', 'ドレイン', 'パワーシュート'] and o[2] == [3, 22] and o[3] == '古墳の守り人', f'QR形式4に 技・あいことば・称号 {o}')
+    check(o[0] == 1 and o[1] == ['通常攻撃', '連続攻撃', 'ドレイン', 'パワーシュート'] and o[2] == [3, 22] and o[3] == '古墳の守り人', f'QR（まなびバトル2 形式1）に 技・あいことば・称号 {o}')
     pg.add_script_tag(content=OLD)
     old = pg.evaluate("Array.from(OLDCODE.encode(MB.S, Object.keys(MB.Q).length))")
-    check(pg.evaluate(f"SAVECODE.decode({old}).fmt") == 3, '形式3の QRも 読める（引きつぎ用）')
+    lo = pg.evaluate(f"(() => {{ const o = SAVECODE.decode({old}); return [o.legacy, o.fmt, Object.keys(o.qs).length]; }})()")
+    check(lo[0] is True and lo[1] == 4 and lo[2] == 0, f'旧作（まなびバトル）の QRも 読める（引きつぎ用・問題は リセット）{lo}')
     nw = pg.evaluate("MB.qrBytes()")
     msg = pg.evaluate(f"(() => {{ try {{ OLDCODE.decode({nw}); return 'よめた'; }} catch (e) {{ return e.message; }} }})()")
-    check('新しいバージョン' in msg, f'前の ゲームは 新しい QRを 読まない（{msg}）')
+    check('まなびバトルのQRではない' in msg, f'旧作は まなびバトル2 の QRを 読まない（{msg}）')
     # 対戦は 形式3を ことわる
     pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove()); void MB.go.home()"); W(150)
     pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove())"); pg.click('#vs'); W(300)
     pg.evaluate(f"MB.scan({old})"); W(200)
-    check('前のバージョン' in pg.inner_text('.ov') and pg.evaluate("MB.VS.phase") == 'scanB', '対戦：前の バージョンの QRは ことわる')
+    check('前のゲーム' in pg.inner_text('.ov') and pg.evaluate("MB.VS.phase") == 'scanB', '対戦：旧作の QRは ことわる')
     pg.evaluate(f"MB.scan({nw})"); W(200)
     check('はじめる' in pg.inner_text('.ov'), '対戦：新しい QRは 読める')
     # ---- あいことば ----
-    pg.evaluate("localStorage.removeItem('manabi_battle_vs'); document.querySelectorAll('.ov').forEach(o=>o.remove()); MB.S.ak = []; MB.S.sel.title=''; MB.S.coins = 0; void MB.go.home()"); W(150)
+    pg.evaluate("localStorage.removeItem('manabato2_vs'); document.querySelectorAll('.ov').forEach(o=>o.remove()); MB.S.ak = []; MB.S.sel.title=''; MB.S.coins = 0; void MB.go.home()"); W(150)
     pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove())")
     pg.click('#set'); W(200)
     n = pg.locator('.setbtns button').count()
@@ -85,12 +87,12 @@ with sync_playwright() as p:
     check(clk in pg.evaluate("MB.S.owned") and pg.evaluate("MB.S.coins") == 550 + 2052, '22話で 銀時計も もらえる（コインは 表のとおり）')
     o4 = pg.evaluate("SAVECODE.decode(MB.qrBytes()).owned")
     check(clk in o4, 'QRに 銀時計も 入る')
-    pg.evaluate("MB.S.owned = MB.S.owned.filter(n => n !== MB.D.CLOCK); localStorage.setItem('manabi_battle_book', JSON.stringify({view:'icon',sort:'rare'})); void MB.go.itemBook()"); W(200)
-    check(pg.locator(f'.bk[data-n="{clk}"]').count() == 0 and '/ 100' in pg.inner_text('.prog'), 'もっていないと もちものに 出ない（？？？にも しない）')
+    pg.evaluate("MB.S.owned = MB.S.owned.filter(n => n !== MB.D.CLOCK); localStorage.setItem('manabato2_book', JSON.stringify({view:'icon',sort:'rare'})); void MB.go.itemBook()"); W(200)
+    check(pg.locator(f'.bk[data-n="{clk}"]').count() == 0 and '/ 130' in pg.inner_text('.prog'), 'もっていないと もちものに 出ない（？？？にも しない）')
     pg.evaluate("MB.S.owned = MB.D.ITEMS.map(i => i.n); void MB.go.itemBook()"); W(200)
-    check(pg.locator(f'.bk[data-n="{clk}"]').count() == 1 and '101 / 100' in pg.inner_text('.prog'), f"もったら ★5に 出る・コンプ後は 101 / 100（{pg.inner_text('.prog')[:20]}）")
+    check(pg.locator(f'.bk[data-n="{clk}"]').count() == 1 and '131 / 130' in pg.inner_text('.prog'), f"もったら ★5に 出る・コンプ後は 131 / 130（{pg.inner_text('.prog')[:20]}）")
     pool = pg.evaluate("MB.S.gachaN = 0; MB.D.ITEMS.filter(it => !it.hid).length")
-    check(pool == 100, 'ふつうの アイテムは 100個のまま')
+    check(pool == 130, 'ふつうの アイテムは 130個（旧作100＋まなびバトル2 30）')
     pg.evaluate("void MB.go.pickItems(MB.S, [], {noTimer:true})"); W(200)
     check(pg.locator(f'.bk[data-n="{clk}"]').count() == 1, 'アイテムえらびに 出る（持っているとき）')
     pg.click('#ok'); W(100)
@@ -105,8 +107,8 @@ with sync_playwright() as p:
         pg.evaluate(BOT, 1.0); W(20)
     log += pg.evaluate("window.__lg")
     check('saw6' in log and 'frozen' in log, f'6ターン目「6 / 5」・相手は 動けない（{log}）')
-    # 前の 形式3から 引きつぐと 技・あいことばは からっぽ
+    # 旧作（形式4）から 引きつぐと 技・あいことばも 引きつぐ
     o3 = pg.evaluate(f"(() => {{ const o = SAVECODE.decode({old}); return [o.skSel, o.ak]; }})()")
-    check(o3 == [[], []], f'形式3から 引きつぐと 技は おぼえた順・あいことばは なし {o3}')
+    check(o3 == [['通常攻撃', '連続攻撃', 'ドレイン', 'パワーシュート'], [3, 22]], f'旧作から 技・あいことばも 引きつぐ {o3}')
     b.close()
 print('errors:', errors or 'なし'); print('NG:', fails or 'なし')

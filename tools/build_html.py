@@ -33,9 +33,9 @@ def data_uri(rel):
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(p), '-ac', '1'] + (['-ar', '22050'] if CANVA else []) + ['-b:a', f'{KBPS}k', str(q)], check=True)
         p = q
     elif CANVA and rel.startswith('fonts/'):
-        q = TMP / p.name
+        q = TMP / (p.stem + '.woff2')  # まなびバトル2：woff2（brotli。pip install brotli）で 小さく（問題が ふえて 字が ふえたため）
         if not q.exists():
-            subprocess.run(['pyftsubset', str(p), f'--text-file={CHARS}', '--flavor=woff', '--layout-features=*', f'--output-file={q}'], check=True, capture_output=True)
+            subprocess.run(['pyftsubset', str(p), f'--text-file={CHARS}', '--flavor=woff2', '--layout-features=*', f'--output-file={q}'], check=True, capture_output=True)
         p = q
     elif CANVA and p.suffix.lower() in ('.jpg', '.jpeg'):  # 背景は WebP に（同じくらいの見た目で 半分）
         from PIL import Image
@@ -47,7 +47,7 @@ def data_uri(rel):
         q = TMP / (p.stem + '_' + str(abs(hash(rel))) + '.webp')
         if not q.exists():
             im = Image.open(p).convert('RGBA')
-            if re.match(r'images/(boss2|zako2|player|npc/kokuusa|ui/magic)', rel): im.save(q, quality=82, alpha_quality=85, method=6)
+            if re.match(r'images/(boss2|zako2|player|npc/kokuusa|ui/magic|item2)', rel): im.save(q, quality=82, alpha_quality=85, method=6)
             else: im.save(q, lossless=True, method=6)
         if q.stat().st_size < p.stat().st_size: p = q
     return f'data:{MIME[p.suffix.lower()]};base64,' + base64.b64encode(p.read_bytes()).decode()
@@ -57,9 +57,12 @@ def js(text): return text.replace('</script', '<\\/script')
 html = (ROOT / 'index.html').read_text()
 css_local = (ASSETS / 'assets.local.css').read_text()
 local_js = (ASSETS / 'assets.local.js').read_text()
+# まなびバトル2：旧作の アイテム画像（images/item/iNN.png）は 新しい 絵（images/item2/iNNN.png）に 置きかえて、assets2.js を うしろに つなぐ
+local_js = re.sub(r'images/item/i(\d+)\.png', lambda m: f'images/item2/i{int(m.group(1)) + 1:03d}.png', local_js) + '\n' + (ROOT / 'assets2.js').read_text()
 
 # CSS（index.html の中と assets.local.css）：パスを その場で data: に（フォント・UI画像。少ない）
 inline = lambda t: PATH.sub(lambda m: data_uri(m.group(0)), t)
+if CANVA: html = html.replace('format("woff")', 'format("woff2")')
 style_parts = re.split(r'(<style>.*?</style>)', html, flags=re.S)
 html = ''.join(inline(s) if s.startswith('<style>') else s for s in style_parts)
 html = html.replace('<link rel="stylesheet" href="assets.local.css">', '<style>\n' + inline(css_local) + '\n</style>')
@@ -73,10 +76,23 @@ def exists(p):
 paths = sorted(set(PATH.findall(local_js)) | {p for p in PATH.findall((ROOT / 'assets.js').read_text()) if exists(p)})
 emb = {p: data_uri(p) for p in paths}
 fix = '<script>(function(){/* data: を blob: に（innerHTML に 長い文字が 入らないように＝画面の切りかえが かるくなる）。画像は 先に デコードしておく */const E=window.__EMB,K=window.__KEEP=[];for(const k in E){const v=E[k],c=v.indexOf(\',\'),t=v.slice(5,v.indexOf(\';\')),b=atob(v.slice(c+1)),u=new Uint8Array(b.length);for(let j=0;j<b.length;j++)u[j]=b.charCodeAt(j);E[k]=URL.createObjectURL(new Blob([u],{type:t}));if(t.startsWith(\'image/\')){const im=new Image();im.src=E[k];if(im.decode)im.decode().catch(()=>{});K.push(im);}}const w=o=>{for(const k in o){const v=o[k];if(typeof v==="string"&&E[v])o[k]=E[v];else if(v&&typeof v==="object")w(v);}};w(window.ASSETS||{});})();</script>'
+# 問題DB（約1.1MB）は raw DEFLATE ＋ base64 で 小さくして 入れ、ひらいたときに lib/inflate.js で もとにもどす（まなびバトル2）
+def qdb_script():
+    import zlib
+    t = (ROOT / 'questions.js').read_text(encoding='utf8')
+    num = lambda k: re.search(r'window\.' + k + r' = ([^;]+);', t).group(1)
+    rows = [json.loads(l.rstrip(',')) for l in t.split('\n') if l.startswith('[') and l.rstrip().endswith('],')]
+    pay = json.dumps({'v': json.loads(num('QDB_VERSION')), 'max': json.loads(num('QDB_MAXID')), 'src': json.loads(num('QDB_SRC')), 'db': rows}, ensure_ascii=False, separators=(',', ':')).encode()
+    c = zlib.compressobj(9, zlib.DEFLATED, -15); z = c.compress(pay) + c.flush()
+    dec = ('(function(){const b=atob(window.__QZ),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);'
+           'const j=JSON.parse(new TextDecoder().decode(window.MB_INFLATE(u)));window.QDB_VERSION=j.v;window.QDB_MAXID=j.max;window.QDB_SRC=j.src;window.QUESTION_DB=j.db;delete window.__QZ;})();')
+    return ('<script>window.__QZ="' + base64.b64encode(z).decode() + '";</script>\n<script>' + js((ROOT / 'lib' / 'inflate.js').read_text()) + '</script>\n<script>' + dec + '</script>')
 def script(m):
     name = m.group(1)
     if name == 'assets.local.js':
         return '<script>window.__EMB=' + js(json.dumps(emb, ensure_ascii=False)) + ';</script>\n<script>' + js(local_js) + '</script>\n' + fix
+    if name == 'assets2.js': return ''  # assets.local.js に つないだ
+    if name == 'questions.js': return qdb_script()
     return '<script>' + js(src(name).read_text()) + '</script>'
 html = re.sub(r'<script src="([^"]+)"></script>', script, html)
 # いつ作った版かを タイトルに出す（Canva で 差しかえが 反映されたか ひと目でわかるように）

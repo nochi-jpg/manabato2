@@ -115,27 +115,21 @@ with sync_playwright() as p:
     v = pg.evaluate("[Object.values(MB.S.st).reduce((a,b)=>a+b), MB.S.owned.length, MB.S.run]")
     check(v[0] > t0 and v[1] == owned0 and v[2] is None, f'負け：ステータスは 足す・持ち帰りなし {t0} → {v}')
 
-    # ---- 出題範囲（10/7）：さいしょは 4年・せっていで 教科ごとに かえる・QRに入る ----
-    pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove()); MB.S.stamina = 2000; MB.S.run = null; MB.S.qs = {}; delete MB.S.qgrade"); pg.evaluate("void MB.go.home()"); W(100)
+    # ---- 学年（まなびバトル2）：1つ下の学年＋その学年（1年生は 1年だけ・英語は 1〜3年生は 3年）・せっていで かえる・QRに入る ----
+    pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove()); MB.S.stamina = 10; MB.S.run = null; MB.S.qs = {}; MB.S.grade = 4"); pg.evaluate("void MB.go.home()"); W(100)
     pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove())")
     pg.evaluate("void MB.go.settings()"); W(100); pg.click('#sQ'); W(100)
-    pg.click('[data-gs="算数"][data-g="6"]'); W(100); pg.click('[data-gs="英語"][data-g="5"]'); W(100)
-    check(pg.evaluate("MB.S.qgrade['算数']") == 6 and 'btn-main' in pg.get_attribute('[data-gs="算数"][data-g="6"]', 'class'), 'せってい → 出題範囲で 算数を 6年に')
+    pg.click('.gradebtns [data-g="6"]'); W(100)
+    check(pg.evaluate("MB.S.grade") == 6 and 'btn-main' in pg.get_attribute('.gradebtns [data-g="6"]', 'class'), 'せってい → 学年を 6年生に')
     pg.click('.ov #cl'); W(100); pg.evaluate("document.querySelectorAll('.ov').forEach(o=>o.remove())")
     pg.click('#dun'); W(50); pg.click('.ov .choices button'); W(150)
-    g = pg.evaluate("""(() => { const T = MB.T, out = {}; for (const s of ['国語','算数','英語']) { out[s] = []; for (let i = 0; i < 15; i++) { const x = T.pickQ(s); out[s].push(MB.Q[x.id].g); T.applyQ(s, x, true); } }
-      out.ev = []; for (let i = 0; i < 30; i++) { const q = T.drawEventQ(); out.ev.push([q.s, q.g]); } return out; })()""")
-    check(set(g['国語']) == {4} and set(g['算数']) == {6} and set(g['英語']) == {5}, f"新しい問題は えらんだ学年だけ（得意な教科でも まぜない）国{set(g['国語'])} 算{set(g['算数'])} 英{set(g['英語'])}")
-    want = {'国語': 4, '算数': 6, '理科': 4, '社会': 4, '英語': 5}
-    check(all(want[s] == gr for s, gr in g['ev']), 'イベントの問題も えらんだ学年')
-    # 解き終わったら 自動で つぎの学年へ（10/7）：4→5→6／5→6→4／6→5→4
-    a = pg.evaluate("""(() => { const S = MB.S, Q = Object.values(MB.Q), T = MB.T, out = [];
-      const fin = g => Q.filter(q => q.s === '算数' && q.g === g).forEach(q => (S.qs[q.id] = 3));
-      const reset = () => Q.filter(q => q.s === '算数').forEach(q => delete S.qs[q.id]);
-      for (const [c, done] of [[5, [5]], [5, [5, 6]], [6, [6]], [6, [6, 5]], [4, [4]], [4, [4, 5]]]) { reset(); S.qgrade['算数'] = c; done.forEach(fin); out.push(T.gradeOf('算数')); }
-      reset(); S.qgrade['算数'] = 6; return out; })()""")
-    check(a == [6, 4, 5, 4, 5, 6], f'解き終わったら 自動で つぎの学年へ（5→6→4・6→5→4・4→5→6）{a}')
-    q = pg.evaluate("SAVECODE.decode(MB.qrBytes()).qgrade")
-    check(q == want, f'QRに 出題範囲 {q}')
+    g = pg.evaluate("""(() => { const T = MB.T, out = {}; for (const s of ['国語','算数','英語']) { out[s] = []; for (let i = 0; i < 30; i++) { const x = T.pickQ(s); out[s].push(MB.Q[x.id].g); T.applyQ(s, x, true); } }
+      out.ev = []; for (let i = 0; i < 30; i++) { const q = T.drawEventQ(); out.ev.push(q.g); } return out; })()""")
+    check(set(g['国語']) <= {5, 6} and set(g['算数']) <= {5, 6} and set(g['英語']) <= {5, 6} and len(set(g['算数'])) == 2, f"6年生：新しい問題は 5・6年 国{set(g['国語'])} 算{set(g['算数'])} 英{set(g['英語'])}")
+    check(set(g['ev']) <= {5, 6}, f"イベントの問題も 5・6年 {set(g['ev'])}")
+    a = pg.evaluate("[1,2,3,4,5,6].map(n => [MB.T.gradeOf('国語', n), MB.T.gradeOf('英語', n)])")
+    check(a == [[[1], [3]], [[1, 2], [3]], [[2, 3], [3]], [[3, 4], [3, 4]], [[4, 5], [4, 5]], [[5, 6], [5, 6]]], f'学年ごとの 出題 {a}')
+    q = pg.evaluate("SAVECODE.decode(MB.qrBytes()).grade")
+    check(q == 6, f'QRに 学年 {q}')
     b.close()
 print('errors:', errors or 'なし'); print('NG:', fails or 'なし')

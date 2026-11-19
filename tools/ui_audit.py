@@ -186,7 +186,7 @@ with sync_playwright() as p:
     audit('対戦：けっか', True)
     pg.click('.ov .choices button >> nth=1'); W(200); pg.evaluate(close)
     # 先生用ページ（クラスの記録が入った状態）
-    pg.evaluate(f"localStorage.setItem('manabi_battle_teacher', JSON.stringify([SAVECODE.decode({bA}), SAVECODE.decode({bB})]))")
+    pg.evaluate(f"localStorage.setItem('manabato2_teacher', JSON.stringify([SAVECODE.decode({bA}), SAVECODE.decode({bB})]))")
     go('titleScreen()'); audit('タイトル', True)
     go('debugRoom()'); audit('デバッグルーム', True)
     go('teacherPage()'); W(300); audit('先生用ページ（記録あり）', True)
